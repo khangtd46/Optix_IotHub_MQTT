@@ -13,7 +13,11 @@ using Optix_PLC_to_MQTT_asynchronous_publish;
 
 public class PublisherLogic : BaseNetLogic
 {
-    private IUAVariable variable1;
+    private IUAVariable PlannedCut;
+	private IUAVariable TargetSpeed;
+	private IUAVariable EmployeeID;
+	private IUAVariable MachineID;
+	private IUAVariable BatchID;
 	private IUAVariable messageVariable;
 	private Timer timer;
 	public override void Start()
@@ -34,7 +38,20 @@ public class PublisherLogic : BaseNetLogic
         // Assign a callback to be executed when a message is published to the broker
         publishClient.MqttMsgPublished += PublishClientMqttMsgPublished;
 
-		variable1 = Project.Current.GetVariable("Model/Variable1");
+		PlannedCut = Project.Current.GetVariable("Model/OEE Variable/PlannedCut");
+		PlannedCut.Value = 100;
+
+		TargetSpeed = Project.Current.GetVariable("Model/OEE Variable/TargetSpeed");
+		TargetSpeed.Value = 100;
+
+		EmployeeID = Project.Current.GetVariable("Model/OEE Variable/EmployeeID");
+		EmployeeID.Value = 10014;
+
+		MachineID = Project.Current.GetVariable("Model/OEE Variable/MachineID");
+		MachineID.Value = 800;
+
+		BatchID = Project.Current.GetVariable("Model/OEE Variable/BatchID");
+		BatchID.Value = 888;
 
 		messageVariable = Project.Current.GetVariable("Model/Message");
 		ushort msgId = publishClient.Subscribe(new string[] { "devices/sample_client/messages/devicebound/#" }, // topic
@@ -77,36 +94,62 @@ public class PublisherLogic : BaseNetLogic
 	private void PublishDataToIoTHub(object state)
 	{
 
-		var PlannedCut = Project.Current.GetVariable("Model/OEE Variable/PlannedCut");
-		var TotalCut = Project.Current.GetVariable("Model/OEE Variable/TotalCut");
-		var GoodCut = Project.Current.GetVariable("Model/OEE Variable/GoodCut");
-		var TargetSpeed = Project.Current.GetVariable("Model/OEE Variable/TargetSpeed");
-		var ActualSpeed = Project.Current.GetVariable("Model/OEE Variable/ActualSpeed");
-		var Uptime = Project.Current.GetVariable("Model/OEE Variable/Uptime");
-		var EmployeeID = Project.Current.GetVariable("Model/OEE Variable/EmployeeID");
-		var MachineID = Project.Current.GetVariable("Model/OEE Variable/MachineID");
-		var BatchID = Project.Current.GetVariable("Model/OEE Variable/BatchID");
-		var Downtime = Project.Current.GetVariable("Model/OEE Variable/Downtime");
-		var DowntimeCode = Project.Current.GetVariable("Model/OEE Variable/DowntimeCode");
-		var BadCut = Project.Current.GetVariable("Model/OEE Variable/BadCut");
-		var BadCutCode = Project.Current.GetVariable("Model/OEE Variable/BadCutCode");
+		var PlannedCutFromHMI = Project.Current.GetVariable("Model/OEE Variable/PlannedCut");
+		var TotalCutFromHMI = Project.Current.GetVariable("Model/OEE Variable/TotalCut");
+		var GoodCutFromHMI = Project.Current.GetVariable("Model/OEE Variable/GoodCut");
+		var TargetSpeedFromHMI = Project.Current.GetVariable("Model/OEE Variable/TargetSpeed");
+		var ActualSpeedFromHMI = Project.Current.GetVariable("Model/OEE Variable/ActualSpeed");
+		var UptimeFromHMI = Project.Current.GetVariable("Model/OEE Variable/Uptime");
+		var EmployeeIDFromHMI = Project.Current.GetVariable("Model/OEE Variable/EmployeeID");
+		var MachineIDFromHMI = Project.Current.GetVariable("Model/OEE Variable/MachineID");
+		var BatchIDFromHMI = Project.Current.GetVariable("Model/OEE Variable/BatchID");
+		var DowntimeFromHMI = Project.Current.GetVariable("Model/OEE Variable/Downtime");
+		var DowntimeCodeFromHMI = Project.Current.GetVariable("Model/OEE Variable/DowntimeCode");
+		var BadCutFromHMI = Project.Current.GetVariable("Model/OEE Variable/BadCut");
+		var BadCutCodeFromHMI = Project.Current.GetVariable("Model/OEE Variable/BadCutCode");
+
+		int plannedCut = (int)PlannedCutFromHMI.Value;
+		int totalCut = 0;
+		int goodCut = 0;
+		int badCut = 0;
+		float actualSpeed = 0;
+		float upTime = 5;
+		int badCutCode = 0;
+
+		Random rnd = new Random();
+		int isBadCut = rnd.Next(0, 1);
+
+		if (isBadCut == 0)
+		{
+			totalCut = rnd.Next(plannedCut/2, plannedCut);
+			goodCut = totalCut;
+			actualSpeed = totalCut / upTime;
+		}
+		else
+		{
+			totalCut = rnd.Next(plannedCut / 2, plannedCut);
+			badCut = rnd.Next(1, totalCut/2);
+			goodCut = totalCut - badCut;
+			actualSpeed = totalCut / upTime;
+			badCutCode = 801;
+		}
 
 		var data = new OeeRawData
 		{
 			LocalTimestamp = DateTime.Now,
-			PlannedCut = (int)PlannedCut.Value,
-			TotalCut = (int)TotalCut.Value,
-			GoodCut = (int)GoodCut.Value,
-			TargetSpeed = (float)TargetSpeed.Value,
-			ActualSpeed = (float)ActualSpeed.Value,
-			Uptime = (float)Uptime.Value,
-			EmployeeID = (int)EmployeeID.Value,
-			MachineID = (int)MachineID.Value,
-			BatchID = (string)BatchID.Value,
-			Downtime = (float)Downtime.Value,
-			DowntimeCode = (int)DowntimeCode.Value,
-			BadCut = (int)BadCut.Value,
-			BadCutCode = (int)BadCutCode.Value,
+			PlannedCut = (int)PlannedCutFromHMI.Value,
+			TotalCut = totalCut,
+			GoodCut = goodCut,
+			TargetSpeed = (float)TargetSpeedFromHMI.Value,
+			ActualSpeed = actualSpeed,
+			Uptime = upTime,
+			EmployeeID = (int)EmployeeIDFromHMI.Value,
+			MachineID = (int)MachineIDFromHMI.Value,
+			BatchID = (string)BatchIDFromHMI.Value,
+			Downtime = (float)DowntimeFromHMI.Value,
+			DowntimeCode = (int)DowntimeCodeFromHMI.Value,
+			BadCut = badCut,
+			BadCutCode = badCutCode,
 		};
 		var jsonStringData = Newtonsoft.Json.JsonConvert.SerializeObject(data);
 
